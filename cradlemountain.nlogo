@@ -1,28 +1,58 @@
 breed [ attractions attraction ]
 breed [ tourists tourist ]
-globals [ patch-data path-file mouse-clicked?]
-patches-own [ path? vegetation-damage lake?]
+breed [ entrances entry ]
+globals [ patch-data path-file elevation-data elevation-file]
+patches-own [ path? vegetation-health lake? elevation trampled? max-health]
 tourists-own [ goal ]
 
 to setup
   clear-all
   set path-file "alltracks.txt"
-  set-default-shape attractions "house"
+  set elevation-file "elevation.txt"
+  set-default-shape attractions "flag"
   set-default-shape tourists "person"
+  set-default-shape entrances "square"
   ask patches [ set pcolor green ]
   load-patch-data
-  Ask n-of tourist-count patches with [pcolor = green][
+  set-patch-elevation
+  place-attractions
+  Ask n-of tourist-count patches with [pcolor != 95 and pcolor != 5][
     sprout-tourists 1 [set goal one-of patches set size 1 set color yellow]
   ]
   reset-ticks
 end
 
 to go
-  place-attraction
   vetegation-growth
   move-tourists ;; temp
   recolor-patches
   tick
+end
+
+to set-patch-elevation
+  ifelse ( file-exists? elevation-file )
+  [
+    set elevation-data []
+    file-open elevation-file
+    while [ not file-at-end? ]
+    [
+      set elevation-data sentence elevation-data (list (list file-read file-read file-read))
+    ]
+    file-close
+    ask patches [set elevation 900]
+    foreach elevation-data [ three-tuple -> ask patch first three-tuple item 1 three-tuple [
+      set elevation last three-tuple
+      ask patches in-radius 20 [set elevation last three-tuple]
+    ] ]
+    repeat 20 [ diffuse elevation 1 ]
+    ask patches [if pcolor != 95 and pcolor != 5  [
+      set max-health round ((2000 - elevation) / 1200 * 100)
+      set pcolor scale-color green elevation 600 1704 ]
+      set vegetation-health max-health
+    ]
+    display
+  ]
+  [ user-message "Cannot find path file in current directory!" ]
 end
 
 to load-patch-data
@@ -41,43 +71,52 @@ to load-patch-data
     foreach patch-data [ three-tuple -> ask patch first three-tuple item 1 three-tuple [ set pcolor last three-tuple ] ]
     ask patches [ifelse pcolor = 5 [set path? true] [set path? false]]
     ask patches [ifelse pcolor = 95 [set lake? true] [set lake? false]]
-    ask patches [if pcolor != 95 and pcolor != 5  [set pcolor green]]
-    ask patches with [ path? ] [
-      if random 60 = 1 [sprout-attractions 1 [set color blue set size 8]]
-    ]
+    ask patches [set trampled? false]
     display
   ]
   [ user-message "Cannot find path file in current directory!" ]
 end
 
-to place-attraction
-  ifelse mouse-down? [
-    if not mouse-clicked? [
-      set mouse-clicked? true
-      ask patch mouse-xcor mouse-ycor [
-        sprout-attractions 1 [set color blue set size 8]
-      ]
-    ]
-  ] [
-    set mouse-clicked? false
-  ]
+to place-attractions
+  create-attractions 10 [set color yellow set size 10]
+  ask attraction 0 [ setxy 240 -47 ] ;; cradle mountain peak
+  ask attraction 1 [ setxy 94 129 ] ;; hansons peak
+  ask attraction 2 [ setxy -2 -31 ] ;; marlons lookout
+  ask attraction 3 [ setxy -107 -100 ] ;; lookout
+  ask attraction 4 [ setxy -48 -80 ] ;; lookout
+  ask attraction 5 [ setxy -73 36 ] ;; boat shed
+  ask attraction 6 [ setxy -68 80 ] ;; glacier rock
+  ask attraction 7 [ setxy -110 -7 ] ;; lake lilla
+  ask attraction 8 [ setxy 112 1 ] ;; lake wilks
+  ask attraction 9 [ setxy 132 65 ] ;; ranges hut
+  ; place entrances
+  create-entrances 2 [set color gray]
+  ask entry 10 [ setxy -108 52 set size 18] ;; main carpark
+  ask entry 11 [ setxy -250 -69 set size 12] ;; secondary path to road
 end
 
+
+
 to vetegation-growth
-  ask patches with [ not any? tourists-here  and vegetation-damage > vegetation-growth-rate] [
-    set vegetation-damage vegetation-damage - vegetation-growth-rate
+  ask patches with [any? tourists-here] [
+    set trampled? true
+    vegetation-trampled
+  ]
+  if ticks mod 500 = 0 [ ; grow every 500 ticks (ideally want this to be about one day) if patch has no been stepped on
+    ask patches with [not trampled?] [
+    set vegetation-health min list (vegetation-health + vegetation-growth-rate) max-health
+     set trampled? false ]
   ]
 end
 
 to vegetation-trampled
-  if vegetation-damage < 100 [set vegetation-damage vegetation-damage + damage-per-step]
+  if vegetation-health > 0 [set vegetation-health max list (vegetation-health - damage-per-step) 0]
 end
 
-to recolor-patches
+to recolor-patches ;; kept this simple for now, need to implement mix of green and red colour
   ask patches with [ not path? and not lake?] [
-    let max-value (80 * 3)
-    set pcolor scale-color green vegetation-damage (- max-value) max-value
-    if vegetation-damage >= 80 [ set pcolor brown ]
+    set pcolor scale-color green elevation 600 1704
+    if vegetation-health < 5 [ set pcolor brown ]
    ]
 end
 
@@ -103,7 +142,6 @@ to walk-towards-goal
 end
 
 to-report best-way-to [ destination ]
-
   ; of all the visible route patches, select the ones
   ; that would take me closer to my destination
   let visible-patches patches in-radius 40
@@ -123,10 +161,10 @@ to-report best-way-to [ destination ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-282
-11
-1191
-531
+325
+19
+1114
+449
 -1
 -1
 1.5
@@ -139,12 +177,12 @@ GRAPHICS-WINDOW
 0
 0
 1
--300
-300
--170
-170
-0
-0
+-260
+260
+-140
+140
+1
+1
 1
 ticks
 30.0
@@ -192,7 +230,7 @@ vegetation-growth-rate
 vegetation-growth-rate
 0
 100
-6.0
+15.0
 1
 1
 NIL
@@ -207,7 +245,7 @@ damage-per-step
 damage-per-step
 0
 100
-30.0
+10.0
 1
 1
 NIL
@@ -222,7 +260,7 @@ tourist-count
 tourist-count
 0
 1000
-904.0
+351.0
 1
 1
 NIL
