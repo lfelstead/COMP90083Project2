@@ -2,7 +2,7 @@ breed [ attractions attraction ]
 breed [ tourists tourist ]
 breed [ entrances entry ]
 globals [ patch-data path-file elevation-data elevation-file time day-length current-tourists]
-patches-own [ path? vegetation-health lake? elevation trampled? max-health]
+patches-own [ path? vegetation-health lake? elevation trampled? max-health dist-goals]
 tourists-own [ goal ]
 
 to setup
@@ -16,12 +16,13 @@ to setup
   load-patch-data
   set-patch-elevation
   place-attractions
-;  Ask n-of tourist-count patches with [pcolor != 95 and pcolor != 5][
-;    sprout-tourists 1 [set goal one-of patches set size 1 set color yellow]
-;  ]
+
+  calculate-path-distances
 
   set time 0
-  set day-length 1440 ;;One tick = 1 minute
+
+  ;; one square is 11 metres - walk at ~4kmh = ~1ms-1 - square every ~12 seconds (because that's neater)
+  set day-length 24 * 60 * 5 ;;One tick = 12 seconds
 
   reset-ticks
 end
@@ -49,8 +50,6 @@ to go
     move-tourists ;; temp
   ]
 
-
-
   run-plots
 
   set time time + 1
@@ -75,10 +74,7 @@ to set-patch-elevation
     ask patches [if pcolor != 95 and pcolor != 5  [
       set max-health round ((2000 - elevation) / 1200 * 100)
       let green-val (elevation - 600) / 1104 * 255
-    5
-
-    set pcolor (list red-val green-val 0)
-      set pcolor scale-color green elevation 600 1704 ]
+      set pcolor (list 0 green-val 0) ]
       set vegetation-health max-health
     ]
     display
@@ -103,6 +99,7 @@ to load-patch-data
     ask patches [ifelse pcolor = 5 [set path? true] [set path? false]]
     ask patches [ifelse pcolor = 95 [set lake? true] [set lake? false]]
     ask patches [set trampled? false]
+    ask patches [set dist-goals [100000 100000 100000 100000 100000 100000 100000 100000 100000 100000 100000 100000]]
     display
   ]
   [ user-message "Cannot find path file in current directory!" ]
@@ -112,7 +109,7 @@ to place-attractions
   create-attractions 10 [set color yellow set size 10]
   ask attraction 0 [ setxy 240 -47 ] ;; cradle mountain peak
   ask attraction 1 [ setxy 94 129 ] ;; hansons peak
-  ask attraction 2 [ setxy -2 -31 ] ;; marlons lookout
+  ask attraction 2 [ setxy -2 -31 ] ;; marions lookout
   ask attraction 3 [ setxy -107 -100 ] ;; lookout
   ask attraction 4 [ setxy -48 -80 ] ;; lookout
   ask attraction 5 [ setxy -73 36 ] ;; boat shed
@@ -126,6 +123,33 @@ to place-attractions
   ask entry 11 [ setxy -250 -69 set size 12] ;; Ronny creek carpark
 end
 
+to calculate-path-distances
+
+  ask (turtle-set attractions entrances) [
+    let goal-no who
+    ask patches in-radius 5 with [path?] [
+      set dist-goals replace-item goal-no dist-goals distance myself
+      propogate-distances goal-no
+    ]
+
+  ]
+
+end
+
+to propogate-distances [goal-no]
+  ask neighbors with [path?] [
+
+    ;; Update closest distance to goal if new distance is significantly less than already recorded
+
+    if [item goal-no dist-goals] of myself < item goal-no dist-goals - 10 [
+
+      set dist-goals replace-item goal-no dist-goals ((item goal-no ([dist-goals] of myself)) + 1)
+      set pcolor scale-color gray (item 11 dist-goals) 0 900
+      propogate-distances goal-no
+    ]
+  ]
+
+end
 
 to gen-tourists
 
@@ -142,11 +166,11 @@ to gen-tourists
     ;; Dove lake carpark more popular - gets 80% of arrivals
     ifelse random-float 1 < 0.8 [
       ask [patch-here] of entry 10 [
-        sprout-tourists (int num-to-gen) [set goal [patch-here] of one-of attractions set size 1 set color yellow]
+        sprout-tourists (int num-to-gen) [set goal one-of attractions set size 1 set color yellow]
       ]
     ][
       ask [patch-here] of entry 11 [
-        sprout-tourists (int num-to-gen) [set goal [patch-here] of one-of attractions set size 1 set color yellow]
+        sprout-tourists (int num-to-gen) [set goal one-of attractions set size 1 set color yellow]
       ]
     ]
 
@@ -167,6 +191,7 @@ to vetegation-growth
 end
 
 to vegetation-trampled
+  set trampled? true
   if vegetation-health > 0 [set vegetation-health max list (vegetation-health - damage-per-step) 0]
 end
 
@@ -184,26 +209,21 @@ end
 ;; tourist code - copied from paths
 to move-tourists
   ask tourists [
-    if any? (patch-set goal) in-radius 2 or ((time / day-length) * 24 > 18 and not member? goal [patch-here] of entrances) [
+    if any? (patch-set [patch-here] of goal) in-radius 5 or ((time / day-length) * 24 > 18 and not member? goal entrances) [
 
-      if member? goal [patch-here] of entrances [
+      if member? goal entrances [
 
         die
       ]
 
       ;; Go back to carpark after 4pm
       ifelse (time / day-length) * 24 > 16 [
-        set goal [patch-here] of min-one-of entrances [distance myself]
+        set goal min-one-of entrances [distance myself]
       ] [
-        set goal [ patch-here ] of one-of attractions
+        set goal one-of attractions
       ]
     ]
     walk-towards-goal
-
-    ask patch-here [
-      set trampled? true
-      vegetation-trampled
-    ]
 
 
   ]
@@ -218,16 +238,22 @@ end
 to-report best-way-to [ destination ]
   ; of all the visible route patches, select the ones
   ; that would take me closer to my destination
-  let visible-patches patches in-radius 40
-  let visible-routes visible-patches with [ pcolor = 5 ]
+
+  let goal-no ([who] of destination)
+
+  let visible-patches patches in-radius 5
+  let visible-routes visible-patches with [ path? ]
   let routes-that-take-me-closer visible-routes with [
-    distance destination < [ distance destination - 1 ] of myself
+    item goal-no dist-goals < [ item goal-no dist-goals - 1] of [patch-here] of myself
   ]
 
   ifelse any? routes-that-take-me-closer [
     ; from those route patches, choose the one that is the closest to me
+
     report min-one-of routes-that-take-me-closer [ distance self ]
   ] [
+
+
     ; if there are no nearby routes to my destination
     report destination
   ]
@@ -353,10 +379,10 @@ NIL
 HORIZONTAL
 
 PLOT
-35
-271
-236
-422
+36
+377
+237
+528
 # of tourists
 NIL
 NIL
@@ -371,10 +397,10 @@ PENS
 "tourists" 1.0 0 -16777216 true "" ""
 
 SLIDER
-35
-223
-255
+36
+329
 256
+362
 test-regrowth-after
 test-regrowth-after
 0
@@ -395,6 +421,23 @@ time-readable
 0
 1
 11
+
+BUTTON
+487
+582
+551
+616
+NIL
+go
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
