@@ -30,7 +30,7 @@ end
 to go
 
   ;; Length of day
-  if time >= day-length [
+  if time >= day-length or (test-regrowth-after > 0 and ticks > test-regrowth-after) [
     set time 0
     ask tourists [die]
     set current-tourists 0
@@ -38,11 +38,12 @@ to go
     vetegation-growth
     recolor-patches
 
+    ask patches with [trampled?] [set trampled? false]
+
     tick
   ]
 
   gen-tourists
-
 
 
   if count tourists > 0 [
@@ -198,17 +199,19 @@ to tourist-init
   set deviation-pos nobody
   set return-pos patch-here
 
-  set exploration-start (- attraction-exploration-time)
+  set exploration-start -1000
 
 end
 
 to vetegation-growth
 
 
-
   ask patches with [not trampled?] [
-  set vegetation-health min list (vegetation-health + vegetation-growth-rate) max-health
-  set trampled? false ]
+    ;Only regrow if not dead, or has healthy neighbours
+    if vegetation-health > (0.05 * max-health) or any? neighbors with [vegetation-health > 0.6 * max-health] [
+      set vegetation-health min list (vegetation-health + ([vegetation-health] of max-one-of neighbors [vegetation-health] * vegetation-growth-rate / 100)) max-health
+    ]
+  ]
 
 end
 
@@ -256,7 +259,13 @@ end
 to walk-towards-goal
   ask patch-here [ vegetation-trampled ]
 
-  if deviation-pos = nobody and time - exploration-start < (attraction-exploration-time [
+  if length path-plan > 0 [
+    move-to item 0 path-plan
+    set path-plan but-first path-plan
+    stop
+  ]
+
+  if deviation-pos = nobody and time - exploration-start < (attraction-exploration-time * 5) [
     set return-pos patch-here
     set deviation-pos one-of patches in-radius attraction-exploration-radius with [pcolor != 95]
   ]
@@ -342,6 +351,22 @@ to-report best-way-to [ destination ]
   ; if there are no nearby routes to my destination
   report heading
 
+end
+
+to-report find-path [goal-no]
+  ask neighbors with [pcolor != 95] [
+
+    ;; Update closest distance to goal if new distance is significantly less than already recorded
+
+    if [item goal-no dist-goals] of myself < item goal-no dist-goals - 10 [
+
+      set dist-goals replace-item goal-no dist-goals ((item goal-no ([dist-goals] of myself)) + 1)
+      ;set pcolor scale-color gray (item 11 dist-goals) 0 900
+
+      ;; Recursively call to update this path's neighbours
+      propogate-distances goal-no
+    ]
+  ]
 
 end
 
@@ -426,9 +451,9 @@ SLIDER
 vegetation-growth-rate
 vegetation-growth-rate
 0
-100
-15.0
-1
+20
+5.0
+0.1
 1
 NIL
 HORIZONTAL
@@ -457,7 +482,7 @@ tourist-count
 tourist-count
 0
 1000
-714.0
+351.0
 1
 1
 NIL
@@ -578,7 +603,7 @@ attraction-exploration-radius
 attraction-exploration-radius
 0
 20
-10.0
+3.0
 1
 1
 NIL
