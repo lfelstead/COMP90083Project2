@@ -3,7 +3,7 @@ breed [ tourists tourist ]
 breed [ entrances entry ]
 globals [ patch-data path-file elevation-data elevation-file time day-length current-tourists]
 patches-own [ path? vegetation-health lake? elevation trampled? max-health dist-goals]
-tourists-own [ goal adheres? path-plan deviation-pos return-pos]
+tourists-own [ goal adheres? path-plan deviation-pos return-pos exploration-start]
 
 to setup
   clear-all
@@ -198,6 +198,8 @@ to tourist-init
   set deviation-pos nobody
   set return-pos patch-here
 
+  set exploration-start -1000
+
 end
 
 to vetegation-growth
@@ -229,7 +231,9 @@ end
 ;; tourist code - copied from paths
 to move-tourists
   ask tourists [
+
     if any? (patch-set [patch-here] of goal) in-radius 5 or ((time / day-length) * 24 > 18 and not member? goal entrances) [
+      set exploration-start time
 
       if member? goal entrances [
 
@@ -251,6 +255,11 @@ end
 
 to walk-towards-goal
   ask patch-here [ vegetation-trampled ]
+
+  if deviation-pos = nobody and time - exploration-start < (attraction-exploration-time * 5) [
+    set return-pos patch-here
+    set deviation-pos one-of patches in-radius attraction-exploration-radius with [pcolor != 95]
+  ]
 
   if deviation-pos = nobody and random-float 100 < deviation-chance and [path?] of patch-here [
     set return-pos patch-here
@@ -448,7 +457,7 @@ tourist-count
 tourist-count
 0
 1000
-714.0
+351.0
 1
 1
 NIL
@@ -558,6 +567,36 @@ deviation-chance
 0.1
 1
 %
+HORIZONTAL
+
+SLIDER
+31
+348
+262
+382
+attraction-exploration-radius
+attraction-exploration-radius
+0
+20
+3.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+31
+390
+276
+424
+attraction-exploration-time
+attraction-exploration-time
+0
+60
+20.0
+1
+1
+minutes
 HORIZONTAL
 
 @#$#@#$#@
