@@ -3,7 +3,7 @@ breed [ tourists tourist ]
 breed [ entrances entry ]
 globals [ patch-data path-file elevation-data elevation-file time day-length current-tourists]
 patches-own [ path? vegetation-health lake? elevation trampled? max-health dist-goals]
-tourists-own [ goal ]
+tourists-own [ goal adheres? path-plan deviation-pos return-pos]
 
 to setup
   clear-all
@@ -123,6 +123,8 @@ to place-attractions
   ask entry 11 [ setxy -250 -69 set size 12] ;; Ronny creek carpark
 end
 
+
+;; Each path section stores the distance from it to each possible goal
 to calculate-path-distances
 
   ask (turtle-set attractions entrances) [
@@ -136,7 +138,9 @@ to calculate-path-distances
 
 end
 
+;; Propogate distance to a goal to neighbouring path segments
 to propogate-distances [goal-no]
+
   ask neighbors with [path?] [
 
     ;; Update closest distance to goal if new distance is significantly less than already recorded
@@ -144,7 +148,9 @@ to propogate-distances [goal-no]
     if [item goal-no dist-goals] of myself < item goal-no dist-goals - 10 [
 
       set dist-goals replace-item goal-no dist-goals ((item goal-no ([dist-goals] of myself)) + 1)
-      set pcolor scale-color gray (item 11 dist-goals) 0 900
+      ;set pcolor scale-color gray (item 11 dist-goals) 0 900
+
+      ;; Recursively call to update this path's neighbours
       propogate-distances goal-no
     ]
   ]
@@ -166,17 +172,31 @@ to gen-tourists
     ;; Dove lake carpark more popular - gets 80% of arrivals
     ifelse random-float 1 < 0.8 [
       ask [patch-here] of entry 10 [
-        sprout-tourists (int num-to-gen) [set goal one-of attractions set size 1 set color yellow]
+        sprout-tourists (int num-to-gen) [tourist-init]
       ]
     ][
       ask [patch-here] of entry 11 [
-        sprout-tourists (int num-to-gen) [set goal one-of attractions set size 1 set color yellow]
+        sprout-tourists (int num-to-gen) [tourist-init]
       ]
     ]
 
 
   ]
 
+end
+
+to tourist-init
+  set goal one-of attractions
+  set size 2
+  set color yellow
+
+  set adheres? random-float 100 > shortcutting-tourists
+
+  if not adheres? [set color pink]
+
+  set path-plan []
+  set deviation-pos nobody
+  set return-pos patch-here
 
 end
 
@@ -231,18 +251,48 @@ end
 
 to walk-towards-goal
   ask patch-here [ vegetation-trampled ]
-  face best-way-to goal
-  fd 1
+
+  if deviation-pos = nobody and random-float 100 < deviation-chance and [path?] of patch-here [
+    set return-pos patch-here
+    set deviation-pos one-of patches in-radius 3 with [pcolor != 95]
+
+  ]
+
+  ifelse deviation-pos != nobody [
+    face deviation-pos
+    fd 1
+
+    if patch-here = deviation-pos [
+
+      ifelse deviation-pos = return-pos [
+
+        set deviation-pos nobody
+      ]
+      [
+        set deviation-pos return-pos
+      ]
+    ]
+
+  ] [
+
+    set heading best-way-to goal
+    fd 1
+  ]
 end
 
 to-report best-way-to [ destination ]
+
+
   ; of all the visible route patches, select the ones
   ; that would take me closer to my destination
 
   let goal-no ([who] of destination)
 
-  let visible-patches patches in-radius 5
+  if goal-no > 11 [report towards destination]
+
+  let visible-patches patches in-radius 4
   let visible-routes visible-patches with [ path? ]
+
   let routes-that-take-me-closer visible-routes with [
     item goal-no dist-goals < [ item goal-no dist-goals - 1] of [patch-here] of myself
   ]
@@ -250,13 +300,39 @@ to-report best-way-to [ destination ]
   ifelse any? routes-that-take-me-closer [
     ; from those route patches, choose the one that is the closest to me
 
-    report min-one-of routes-that-take-me-closer [ distance self ]
-  ] [
+    let next-path min-one-of routes-that-take-me-closer [ distance self ]
 
+    ;; If this person does not adhere to track rules, they'll take a shortcut if the path deviates from the
+    ;; 'as the crow flies' direction to destination by more than shortcut-threshold degrees
+    ;; Extra condition to keep them walking through water
 
-    ; if there are no nearby routes to my destination
-    report destination
+    ifelse not adheres? and ((abs (towards next-path - towards destination)) >= shortcut-threshold)
+    [
+      ;; Add +- 5 degrees because scrub bashing does not work in a straight line
+      let off-path (towards destination) + random-float 10 - 5
+
+      set heading off-path
+
+    ]
+
+    [set heading towards next-path]
+
   ]
+  [set heading towards destination]
+
+  ;; More effort to stop them walking through water
+;  if patch-ahead 1 != nobody and [pcolor] of patch-ahead 1 = 95 [ ;; Go around water
+;      ifelse any? patches with [pcolor != 95] in-radius 3 [
+;        report towards min-one-of patches with [pcolor != 95] in-radius 3 [distance destination]
+;      ]
+;      [
+;        report towards destination
+;      ]
+;  ]
+
+  ; if there are no nearby routes to my destination
+  report heading
+
 
 end
 
@@ -356,9 +432,9 @@ SLIDER
 damage-per-step
 damage-per-step
 0
-20
+10
 1.0
-1
+0.1
 1
 NIL
 HORIZONTAL
@@ -372,17 +448,17 @@ tourist-count
 tourist-count
 0
 1000
-96.0
+714.0
 1
 1
 NIL
 HORIZONTAL
 
 PLOT
-36
-377
-237
-528
+35
+495
+236
+646
 # of tourists
 NIL
 NIL
@@ -397,10 +473,10 @@ PENS
 "tourists" 1.0 0 -16777216 true "" ""
 
 SLIDER
-36
-329
-256
-362
+35
+447
+255
+480
 test-regrowth-after
 test-regrowth-after
 0
@@ -438,6 +514,51 @@ NIL
 NIL
 NIL
 1
+
+SLIDER
+33
+211
+259
+244
+shortcutting-tourists
+shortcutting-tourists
+0
+100
+5.0
+1
+1
+%
+HORIZONTAL
+
+SLIDER
+33
+258
+262
+291
+shortcut-threshold
+shortcut-threshold
+0
+180
+60.0
+1
+1
+degrees
+HORIZONTAL
+
+SLIDER
+34
+303
+262
+337
+deviation-chance
+deviation-chance
+0
+10
+1.5
+0.1
+1
+%
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
