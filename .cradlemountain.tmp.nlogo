@@ -1,7 +1,7 @@
 breed [ attractions attraction ]
 breed [ tourists tourist ]
 breed [ entrances entry ]
-globals [ patch-data path-file elevation-data elevation-file days]
+globals [ patch-data path-file elevation-data elevation-file days day-length current-tourists]
 patches-own [ path? vegetation-health lake? elevation trampled? max-health]
 tourists-own [ goal ]
 
@@ -16,11 +16,12 @@ to setup
   load-patch-data
   set-patch-elevation
   place-attractions
-  Ask n-of tourist-count patches with [pcolor != 95 and pcolor != 5][
-    sprout-tourists 1 [set goal one-of patches set size 1 set color yellow]
-  ]
+;  Ask n-of tourist-count patches with [pcolor != 95 and pcolor != 5][
+;    sprout-tourists 1 [set goal one-of patches set size 1 set color yellow]
+;  ]
 
   set days 0
+  set day-length 1440 ;;One tick = 1 minute
 
   reset-ticks
 end
@@ -28,17 +29,24 @@ end
 to go
 
   ;; Length of day
-  if ticks mod 1440 = 0 and days > 0 [
-    set days days + 1
+  if ticks mod day-length = 0 [
+
     ask tourists [die]
+    set current-tourists 0
 
-
+    set days days + 1
+    print days
   ]
 
+  gen-tourists
 
   vetegation-growth
-  move-tourists ;; temp
-  recolor-patches
+
+  if count tourists > 0 [
+
+    move-tourists ;; temp
+    recolor-patches
+  ]
 
   tick
 end
@@ -110,13 +118,42 @@ to place-attractions
 end
 
 
+to gen-tourists
+
+
+  ;; Arrivals start 7am, peak 11am, end 3pm
+  let hour (ticks mod day-length) / 24
+  let tourists-this-tick (tourist-count / (day-length / 3)) * 4.9 * ((- abs ((hour - 11) / 4)) + 1)
+
+  if tourists-this-tick > 0 [
+    set current-tourists current-tourists + tourists-this-tick
+  ]
+
+  let num-to-gen int (current-tourists - count tourists)
+
+  ;; Dove lake carpark more popular - gets 80% of arrivals
+  ifelse random-float 1 < 0.8 [
+    ask [patch-here] of entry 10 [
+      sprout-tourists (int num-to-gen) [set goal one-of patches set size 1 set color yellow]
+    ]
+  ][
+    ask [patch-here] of entry 11 [
+      sprout-tourists (int num-to-gen) [set goal one-of patches set size 1 set color yellow]
+    ]
+  ]
+
+
+
+
+
+end
 
 to vetegation-growth
   ask patches with [any? tourists-here] [
     set trampled? true
     vegetation-trampled
   ]
-  if ticks mod 1440 = 0 [ ; grow at start of each day
+  if ticks mod day-length = 0 [ ; grow at start of each day
     ask patches with [not trampled?] [
     set vegetation-health min list (vegetation-health + vegetation-growth-rate) max-health
      set trampled? false ]
@@ -133,7 +170,7 @@ to recolor-patches ;; kept this simple for now, need to implement mix of green a
     let green-val (elevation - 600) / 1104 * 255
     let red-val (max-health - vegetation-health) / 100 * 255
 
-    set pcolor red-val green-val 0]
+    set pcolor (list red-val green-val 0)
 
    ]
 end
@@ -283,6 +320,24 @@ tourist-count
 1
 NIL
 HORIZONTAL
+
+PLOT
+41
+263
+242
+414
+# of tourists
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot count tourists"
 
 @#$#@#$#@
 ## WHAT IS IT?
