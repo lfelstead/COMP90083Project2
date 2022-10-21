@@ -133,7 +133,7 @@ to recolor-patches ;; kept this simple for now, need to implement mix of green a
     let green-val (elevation - 600) / 1104 * 255
     let red-val (max-health - vegetation-health) / 100 * 255
 
-    set pcolor (list red-val green-val 0)
+    set pcolor red-val green-val 0]
 
    ]
 end
