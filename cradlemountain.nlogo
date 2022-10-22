@@ -5,6 +5,9 @@ globals [ patch-data path-file elevation-data elevation-file time day-length cur
 patches-own [ path? vegetation-health lake? elevation trampled? max-health dist-goals dead?]
 tourists-own [ goal adheres? path-plan deviation-pos return-pos exploration-start happiness]
 
+breed [path-nodes path-node]
+path-nodes-own [owner loc dist]
+
 to setup
   clear-all
   set path-file "alltracks.txt"
@@ -210,8 +213,10 @@ to vetegation-growth
 
   ask patches with [not trampled?] [
     ;Only regrow if not dead, or has healthy neighbours
-    if vegetation-health > (0.05 * max-health) or any? neighbors with [vegetation-health > 0.6 * max-health] [
+    if not dead? or any? neighbors with [vegetation-health > 0.6 * max-health] [
       set vegetation-health min list (vegetation-health + ([vegetation-health] of max-one-of neighbors [vegetation-health] * vegetation-growth-rate / 100)) max-health
+      if vegetation-health >= 5
+      [ set dead? false ]
     ]
   ]
 
@@ -230,7 +235,6 @@ to recolor-patches ;; mix of red and green
 
     set pcolor (list red-val green-val 0)
 
-    if vegetation-health < 5 [set dead? true]
 
 
    ]
@@ -346,9 +350,19 @@ to-report best-way-to [ destination ]
     ifelse not adheres? and ((abs (towards next-path - towards destination)) >= shortcut-threshold)
     [
       ;; Add +- 5 degrees because scrub bashing does not work in a straight line
-      let off-path (towards destination) + random-float 10 - 5
+;      let off-path (towards destination) + random-float 10 - 5
+;
+;      set heading off-path
 
-      set heading off-path
+      hatch-path-nodes 1 [set dist distance destination set size 0 set owner myself set loc patch-here]
+      let first-node one-of path-nodes with [owner = myself]
+
+      set path-plan find-path first-node destination []
+      print path-plan
+      set heading towards item 1 path-plan
+      set path-plan but-first (but-first path-plan)
+      report heading
+
 
     ]
 
@@ -372,22 +386,28 @@ to-report best-way-to [ destination ]
 
 end
 
-to-report find-path [goal-no]
-  ask neighbors with [pcolor != 95] [
 
-    ;; Update closest distance to goal if new distance is significantly less than already recorded
+;; A* in netlogo. Maybe not the brightest idea I've ever had
+to-report find-path [ node destination fpath-plan ]
 
-    if [item goal-no dist-goals] of myself < item goal-no dist-goals - 10 [
-
-      set dist-goals replace-item goal-no dist-goals ((item goal-no ([dist-goals] of myself)) + 1)
-      ;set pcolor scale-color gray (item 11 dist-goals) 0 900
-
-      ;; Recursively call to update this path's neighbours
-      propogate-distances goal-no
-    ]
+  if [loc] of node = [patch-here] of destination
+  [
+    report (list node)
   ]
 
+  ask neighbors with [pcolor != 95 and not path?] [
+
+    let powner [owner] of node
+    sprout-path-nodes 1 [set dist distance destination set size 0 set owner [powner] of myself set loc myself]
+
+  ]
+
+  let next min-one-of path-nodes with [owner = myself] [dist]
+
+  report (list self find-path next destination fpath-plan)
+
 end
+
 
 to-report time-readable
   report (word int ((time / day-length) * 24) ":" int ((time / day-length) * 1440 mod 60))
@@ -501,7 +521,7 @@ tourist-count
 tourist-count
 0
 1000
-351.0
+3.0
 1
 1
 NIL
@@ -560,7 +580,7 @@ shortcutting-tourists
 shortcutting-tourists
 0
 100
-5.0
+100.0
 1
 1
 %
@@ -647,6 +667,23 @@ mean [happiness] of tourists
 17
 1
 11
+
+BUTTON
+636
+584
+700
+618
+NIL
+go
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
