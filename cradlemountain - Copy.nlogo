@@ -518,8 +518,8 @@ SLIDER
 tourist-count
 tourist-count
 0
-1000
-351.0
+2000
+1500.0
 1
 1
 NIL
@@ -659,7 +659,7 @@ MONITOR
 253
 625
 450
-671
+670
 NIL
 mean [happiness] of tourists
 17
@@ -670,7 +670,7 @@ MONITOR
 263
 695
 383
-741
+740
 NIL
 vegetation-decile 5
 17
@@ -681,7 +681,7 @@ SLIDER
 30
 435
 250
-469
+468
 tourist-view-radius
 tourist-view-radius
 1
@@ -696,7 +696,7 @@ SLIDER
 33
 480
 295
-514
+513
 vegetation-unhappiness-threshold
 vegetation-unhappiness-threshold
 0

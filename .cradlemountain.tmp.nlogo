@@ -519,7 +519,7 @@ tourist-count
 tourist-count
 0
 1000
-351.0
+100.0
 1
 1
 NIL
@@ -701,7 +701,7 @@ vegetation-unhappiness-threshold
 vegetation-unhappiness-threshold
 0
 10
-2.0
+1.0
 0.1
 1
 %
@@ -1054,10 +1054,10 @@ NetLogo 6.2.2
 @#$#@#$#@
 @#$#@#$#@
 <experiments>
-  <experiment name="experiment" repetitions="10" runMetricsEveryStep="true">
+  <experiment name="experiment" repetitions="3" sequentialRunOrder="false" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>repeat day-length[go]</go>
-    <exitCondition>ticks &gt;= 10</exitCondition>
+    <timeLimit steps="100"/>
     <metric>ticks</metric>
     <metric>count patches with [vegetation-health &lt; 5 and not path? and not lake?]</metric>
     <metric>happiness-avg / happiness-count</metric>
@@ -1072,7 +1072,12 @@ NetLogo 6.2.2
     <metric>vegetation-decile 9</metric>
     <metric>vegetation-decile 10</metric>
     <enumeratedValueSet variable="tourist-count">
-      <value value="351"/>
+      <value value="100"/>
+      <value value="300"/>
+      <value value="500"/>
+      <value value="700"/>
+      <value value="900"/>
+      <value value="1500"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="shortcutting-tourists">
       <value value="5"/>
