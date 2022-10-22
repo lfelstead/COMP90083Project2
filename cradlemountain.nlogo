@@ -1,7 +1,7 @@
 breed [ attractions attraction ]
 breed [ tourists tourist ]
 breed [ entrances entry ]
-globals [ patch-data path-file elevation-data elevation-file time day-length current-tourists]
+globals [ patch-data path-file elevation-data elevation-file time day-length current-tourists happiness-avg happiness-count]
 patches-own [ path? vegetation-health lake? elevation trampled? max-health dist-goals dead?]
 tourists-own [ goal adheres? path-plan deviation-pos return-pos exploration-start happiness]
 
@@ -20,6 +20,8 @@ to setup
   calculate-path-distances
 
   set time 0
+  set happiness-avg 0
+  set happiness-count 1
 
   ;; one square is 11 metres - walk at ~4kmh = ~1ms-1 - square every ~12 seconds (because that's neater)
   set day-length 24 * 60 * 5 ;;One tick = 12 seconds
@@ -32,14 +34,17 @@ to go
   ;; Length of day
   if time >= day-length or (test-regrowth-after > 0 and ticks > test-regrowth-after) [
     set time 0
-    ask tourists [die]
+    ask tourists [tourist-remove]
+
     set current-tourists 0
+
+    tick
 
     vetegation-growth
     recolor-patches
 
     ask patches with [trampled?] [set trampled? false]
-    tick
+
   ]
 
   gen-tourists
@@ -144,9 +149,9 @@ to propogate-distances [goal-no]
 
   ask neighbors with [path?] [
 
-    ;; Update closest distance to goal if new distance is significantly less than already recorded
+    ;; Update closest distance to goal if new distance is less than already recorded
 
-    if [item goal-no dist-goals] of myself < item goal-no dist-goals - 10 [
+    if [item goal-no dist-goals] of myself <= item goal-no dist-goals - 2 [
 
       set dist-goals replace-item goal-no dist-goals ((item goal-no ([dist-goals] of myself)) + 1)
       ;set pcolor scale-color gray (item 11 dist-goals) 0 900
@@ -199,19 +204,26 @@ to tourist-init
   set deviation-pos nobody
   set return-pos patch-here
 
-  set happiness 50
+  set happiness 100
 
   set exploration-start -1000
 
 end
 
-to vetegation-growth
+to tourist-remove
+  set happiness-avg happiness-avg + happiness
+  set happiness-count happiness-count + 1
+  die
+end
 
+to vetegation-growth
 
   ask patches with [not trampled?] [
     ;Only regrow if not dead, or has healthy neighbours
-    if vegetation-health > (0.05 * max-health) or any? neighbors with [vegetation-health > 0.6 * max-health] [
+    if not dead? or any? neighbors with [vegetation-health > 0.6 * max-health] [
       set vegetation-health min list (vegetation-health + ([vegetation-health] of max-one-of neighbors [vegetation-health] * vegetation-growth-rate / 100)) max-health
+      if vegetation-health >= 5
+      [ set dead? false ]
     ]
   ]
 
@@ -243,13 +255,12 @@ to move-tourists
     if any? (patch-set [patch-here] of goal) in-radius 5 or ((time / day-length) * 24 > 18 and not member? goal entrances) [
       set exploration-start time
 
-      if any? (patch-set [patch-here] of goal) in-radius 5 [ ; increase happiness when goal is reached
-        set happiness happiness + 20
-      ]
+;      if any? (patch-set [patch-here] of goal) in-radius 5 and member? goal attractions [ ; increase happiness when goal is reached
+;        set happiness happiness + 20
+;      ]
 
       if member? goal entrances [
-
-        die
+        tourist-remove
       ]
 
       ;; Go back to carpark after 4pm
@@ -262,10 +273,11 @@ to move-tourists
     walk-towards-goal
 
     ; change happiness depending on the amount of tourists around
-    if count (other tourists) in-radius 10 > 3 [set happiness happiness - 1 ] ;[set happiness happiness + 1 ]
+    if count (other tourists) in-radius tourist-view-radius > 10 [set happiness happiness - 1 ] ;[set happiness happiness + 1 ]
 
     ; change happiness depending on the vegetation health
-    ifelse [dead?] of patch-here [set happiness happiness - 1 ] [set happiness happiness + 1 ]
+    ifelse count patches in-radius tourist-view-radius with [not path? and not lake? and dead?] / (tourist-view-radius * tourist-view-radius) > vegetation-unhappiness-threshold
+    [ set happiness happiness - 1 ] [set happiness happiness + 1 ]
 
     ; keep within 0-100 range
     set happiness max list happiness 0
@@ -327,7 +339,7 @@ to-report best-way-to [ destination ]
 
   if goal-no > 11 [report towards destination]
 
-  let visible-patches patches in-radius 4
+  let visible-patches patches in-radius 3
   let visible-routes visible-patches with [ path? ]
 
   let routes-that-take-me-closer visible-routes with [
@@ -399,6 +411,12 @@ to run-plots
   set-current-plot-pen "tourists"
   plot count tourists
 
+end
+
+to-report vegetation-decile [n]
+
+  if n = 1 [report count patches with [not path? and not lake? and vegetation-health = 0] + count patches with [not path? and not lake? and (vegetation-health / max-health) > ((n - 1) / 10) and (vegetation-health / max-health) <= (n / 10)]]
+  report count patches with [not path? and not lake? and (vegetation-health / max-health) > ((n - 1) / 10) and (vegetation-health / max-health) <= (n / 10)]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -508,10 +526,10 @@ NIL
 HORIZONTAL
 
 PLOT
-35
-495
-236
-646
+32
+570
+233
+721
 # of tourists
 NIL
 NIL
@@ -526,10 +544,10 @@ PENS
 "tourists" 1.0 0 -7500403 true "" ""
 
 SLIDER
-35
-447
-255
-480
+32
+522
+252
+555
 test-regrowth-after
 test-regrowth-after
 0
@@ -627,10 +645,10 @@ minutes
 HORIZONTAL
 
 MONITOR
-256
-497
-425
-542
+253
+572
+422
+617
 # of dead vetegation patches
 count patches with [vegetation-health < 5 and not path? and not lake?]
 17
@@ -638,15 +656,56 @@ count patches with [vegetation-health < 5 and not path? and not lake?]
 11
 
 MONITOR
-256
-549
-446
-594
+253
+625
+450
+671
 NIL
 mean [happiness] of tourists
 17
 1
 11
+
+MONITOR
+263
+695
+383
+741
+NIL
+vegetation-decile 5
+17
+1
+11
+
+SLIDER
+30
+435
+250
+469
+tourist-view-radius
+tourist-view-radius
+1
+50
+10.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+33
+480
+295
+514
+vegetation-unhappiness-threshold
+vegetation-unhappiness-threshold
+0
+10
+2.0
+0.1
+1
+%
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -994,6 +1053,53 @@ NetLogo 6.2.2
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
+<experiments>
+  <experiment name="experiment" repetitions="10" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>repeat day-length[go]</go>
+    <exitCondition>ticks &gt;= 100</exitCondition>
+    <metric>ticks</metric>
+    <metric>count patches with [vegetation-health &lt; 5 and not path? and not lake?]</metric>
+    <metric>happiness-avg / happiness-count</metric>
+    <metric>vegetation-decile 1</metric>
+    <metric>vegetation-decile 2</metric>
+    <metric>vegetation-decile 3</metric>
+    <metric>vegetation-decile 4</metric>
+    <metric>vegetation-decile 5</metric>
+    <metric>vegetation-decile 6</metric>
+    <metric>vegetation-decile 7</metric>
+    <metric>vegetation-decile 8</metric>
+    <metric>vegetation-decile 9</metric>
+    <metric>vegetation-decile 10</metric>
+    <enumeratedValueSet variable="tourist-count">
+      <value value="351"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="shortcutting-tourists">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="shortcut-threshold">
+      <value value="60"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="test-regrowth-after">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="deviation-chance">
+      <value value="1.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="vegetation-growth-rate">
+      <value value="15"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="attraction-exploration-radius">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="damage-per-step">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="attraction-exploration-time">
+      <value value="20"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default
