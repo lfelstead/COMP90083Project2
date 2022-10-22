@@ -2,8 +2,8 @@ breed [ attractions attraction ]
 breed [ tourists tourist ]
 breed [ entrances entry ]
 globals [ patch-data path-file elevation-data elevation-file time day-length current-tourists]
-patches-own [ path? vegetation-health lake? elevation trampled? max-health dist-goals]
-tourists-own [ goal adheres? path-plan deviation-pos return-pos exploration-start]
+patches-own [ path? vegetation-health lake? elevation trampled? max-health dist-goals dead?]
+tourists-own [ goal adheres? path-plan deviation-pos return-pos exploration-start happiness]
 
 to setup
   clear-all
@@ -39,7 +39,6 @@ to go
     recolor-patches
 
     ask patches with [trampled?] [set trampled? false]
-
     tick
   ]
 
@@ -77,6 +76,7 @@ to set-patch-elevation
       let green-val (elevation - 600) / 1104 * 255
       set pcolor (list 0 green-val 0) ]
       set vegetation-health max-health
+      set dead? false
     ]
     display
   ]
@@ -99,7 +99,7 @@ to load-patch-data
     foreach patch-data [ three-tuple -> ask patch first three-tuple item 1 three-tuple [ set pcolor last three-tuple ] ]
     ask patches [ifelse pcolor = 5 [set path? true] [set path? false]]
     ask patches [ifelse pcolor = 95 [set lake? true] [set lake? false]]
-    ask patches [set trampled? false]
+    ask patches [set trampled? false set dead? false]
     ask patches [set dist-goals [100000 100000 100000 100000 100000 100000 100000 100000 100000 100000 100000 100000]]
     display
   ]
@@ -199,6 +199,8 @@ to tourist-init
   set deviation-pos nobody
   set return-pos patch-here
 
+  set happiness 50
+
   set exploration-start -1000
 
 end
@@ -228,6 +230,9 @@ to recolor-patches ;; mix of red and green
 
     set pcolor (list red-val green-val 0)
 
+    if vegetation-health < 5 [set dead? true]
+
+
    ]
 end
 
@@ -237,6 +242,10 @@ to move-tourists
 
     if any? (patch-set [patch-here] of goal) in-radius 5 or ((time / day-length) * 24 > 18 and not member? goal entrances) [
       set exploration-start time
+
+      if any? (patch-set [patch-here] of goal) in-radius 5 [ ; increase happiness when goal is reached
+        set happiness happiness + 20
+      ]
 
       if member? goal entrances [
 
@@ -251,6 +260,16 @@ to move-tourists
       ]
     ]
     walk-towards-goal
+
+    ; change happiness depending on the amount of tourists around
+    if count (other tourists) in-radius 10 > 3 [set happiness happiness - 1 ] ;[set happiness happiness + 1 ]
+
+    ; change happiness depending on the vegetation health
+    ifelse [dead?] of patch-here [set happiness happiness - 1 ] [set happiness happiness + 1 ]
+
+    ; keep within 0-100 range
+    set happiness max list happiness 0
+    set happiness min list happiness 100
 
 
   ]
@@ -504,7 +523,7 @@ true
 false
 "" ""
 PENS
-"tourists" 1.0 0 -16777216 true "" ""
+"tourists" 1.0 0 -7500403 true "" ""
 
 SLIDER
 35
@@ -531,23 +550,6 @@ time-readable
 0
 1
 11
-
-BUTTON
-487
-582
-551
-616
-NIL
-go
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
 
 SLIDER
 33
@@ -583,7 +585,7 @@ SLIDER
 34
 303
 262
-337
+336
 deviation-chance
 deviation-chance
 0
@@ -598,7 +600,7 @@ SLIDER
 31
 348
 262
-382
+381
 attraction-exploration-radius
 attraction-exploration-radius
 0
@@ -613,7 +615,7 @@ SLIDER
 31
 390
 276
-424
+423
 attraction-exploration-time
 attraction-exploration-time
 0
@@ -623,6 +625,28 @@ attraction-exploration-time
 1
 minutes
 HORIZONTAL
+
+MONITOR
+256
+497
+425
+542
+# of dead vetegation patches
+count patches with [vegetation-health < 5 and not path? and not lake?]
+17
+1
+11
+
+MONITOR
+256
+549
+446
+594
+NIL
+mean [happiness] of tourists
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
