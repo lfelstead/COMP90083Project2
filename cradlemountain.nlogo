@@ -7,18 +7,25 @@ tourists-own [ goal adheres? path-plan deviation-pos return-pos exploration-star
 
 to setup
   clear-all
+  ;; read in files created using GPS data
   set path-file "alltracks.txt"
   set elevation-file "elevation.txt"
+
+  ;; set turtle shapes
   set-default-shape attractions "flag"
   set-default-shape tourists "person"
   set-default-shape entrances "square"
+
   ask patches [ set pcolor green ]
+
+  ; construct environment
   load-patch-data
   set-patch-elevation
   place-attractions
 
   calculate-path-distances
 
+  ; initialise reporting values
   set time 0
   set happiness-avg 0
   set happiness-count 1
@@ -61,6 +68,7 @@ to go
 end
 
 to set-patch-elevation
+  ; read file containing coordinates and corresponding elevation
   ifelse ( file-exists? elevation-file )
   [
     set elevation-data []
@@ -70,14 +78,21 @@ to set-patch-elevation
       set elevation-data sentence elevation-data (list (list file-read file-read file-read))
     ]
     file-close
+    ; set default value
     ask patches [set elevation 900]
+    ; for each set of three (x, y, elevation) get corresponding patch and assign elevation value
     foreach elevation-data [ three-tuple -> ask patch first three-tuple item 1 three-tuple [
       set elevation last three-tuple
+      ; set neighbours to same elevation
       ask patches in-radius 20 [set elevation last three-tuple]
     ] ]
+    ;; diffuse elevation scores so that there is a smooth transition between neighbouring values
     repeat 20 [ diffuse elevation 1 ]
+    ;; if patches are not track or lake
     ask patches [if pcolor != 95 and pcolor != 5  [
+      ; set max-health to be out of 100 and inverse to elevation
       set max-health round ((2000 - elevation) / 1200 * 100)
+      ; colour patches depending on their elevation
       let green-val (elevation - 600) / 1104 * 255
       set pcolor (list 0 green-val 0) ]
       set vegetation-health max-health
@@ -89,6 +104,7 @@ to set-patch-elevation
 end
 
 to load-patch-data
+  ; read file containing coordinates and corresponding color for tracks and lakes
   ifelse ( file-exists? path-file )
   [
     set patch-data []
@@ -101,10 +117,15 @@ to load-patch-data
 
     clear-patches
     clear-turtles
+    ; for each set of three (x, y, color) get corresponding patch and assign color
     foreach patch-data [ three-tuple -> ask patch first three-tuple item 1 three-tuple [ set pcolor last three-tuple ] ]
+    ; if color = 5 (gray) set path true
     ask patches [ifelse pcolor = 5 [set path? true] [set path? false]]
+    ; if color = 95 (blue) set lake true
     ask patches [ifelse pcolor = 95 [set lake? true] [set lake? false]]
+    ; initialise patch variables
     ask patches [set trampled? false set dead? false]
+    ; for each patch calculate the distance to each of the 10 attractions
     ask patches [set dist-goals [100000 100000 100000 100000 100000 100000 100000 100000 100000 100000 100000 100000]]
     display
   ]
@@ -112,6 +133,7 @@ to load-patch-data
 end
 
 to place-attractions
+  ; places flag corresponding to real-life attraction at set x y coordinates
   create-attractions 10 [set color yellow set size 10]
   ask attraction 0 [ setxy 240 -47 ] ;; cradle mountain peak
   ask attraction 1 [ setxy 94 129 ] ;; hansons peak
@@ -217,7 +239,7 @@ to tourist-remove
 end
 
 to vetegation-growth
-
+  ; patches that have not been trampled in the last day may regrow
   ask patches with [not trampled?] [
     ;Only regrow if not dead, or has healthy neighbours
     if not dead? or any? neighbors with [vegetation-health > 0.6 * max-health] [
@@ -230,12 +252,13 @@ to vetegation-growth
 end
 
 to vegetation-trampled
+  ; decrease vegetation health by damage-per-step value
   set trampled? true
   if vegetation-health > 0 [set vegetation-health max list (vegetation-health - damage-per-step) 0]
 end
 
-to recolor-patches ;; mix of red and green
-
+to recolor-patches
+  ;; set patch color as a mix of red and green depending on elevation and health
   ask patches with [ not path? and not lake?] [
     let green-val (elevation - 600) / 1104 * 255
     let red-val (max-health - vegetation-health) / 100 * 255
@@ -526,10 +549,10 @@ NIL
 HORIZONTAL
 
 PLOT
-32
-570
-233
-721
+324
+460
+525
+611
 # of tourists
 NIL
 NIL
@@ -645,10 +668,10 @@ minutes
 HORIZONTAL
 
 MONITOR
-253
-572
-422
-617
+537
+463
+708
+508
 # of dead vetegation patches
 count patches with [vegetation-health < 5 and not path? and not lake?]
 17
@@ -656,10 +679,10 @@ count patches with [vegetation-health < 5 and not path? and not lake?]
 11
 
 MONITOR
-253
-625
-450
-671
+537
+514
+708
+559
 NIL
 mean [happiness] of tourists
 17
@@ -667,10 +690,10 @@ mean [happiness] of tourists
 11
 
 MONITOR
-263
-695
-383
-741
+540
+567
+707
+612
 NIL
 vegetation-decile 5
 17
@@ -681,7 +704,7 @@ SLIDER
 30
 435
 250
-469
+468
 tourist-view-radius
 tourist-view-radius
 1
@@ -696,7 +719,7 @@ SLIDER
 33
 480
 295
-514
+513
 vegetation-unhappiness-threshold
 vegetation-unhappiness-threshold
 0
@@ -708,41 +731,42 @@ vegetation-unhappiness-threshold
 HORIZONTAL
 
 @#$#@#$#@
-## WHAT IS IT?
+##   Purpose
+To examine how various interventions applied to Cradle Mountain visitation affect the damage visitors cause to the environment.
 
-(a general understanding of what the model is trying to show or explain)
+##   Entities, State Variables, Scale
+Tourists - individuals / groups who want to visit the park. Tourists will arrive according to the visitors submodel, and stay for a random 1-5 days. There are several ‘attractions’ (walks or scenic views) they wish to visit, which may contribute to their happiness with their visit. They also cause damage to the surrounding environment, depending on their movement behaviour. People have happiness which increases when they complete walks or see scenic views at the park.
 
-## HOW IT WORKS
+Environment - A rough topographical model of the Cradle Mountain area. GPS data was obtained from AllTrails, a database for trail maps commonly used by hikers. The GPS coordinates and elevation data were combined to generate the landscape. This area covers roughly 5.8km. The spatial scale used was 1 cell = 11 square metres. 
 
-(what rules the agents use to create the overall behavior of the model)
+Vegetation - inhabits each cell, and has a given resilience to trampling based on elevation and corresponding health as it is trampled. Resilience determined by vegetation submodel. 
 
-## HOW TO USE IT
+Tracks - built paths for people to walk on. The geographical layout of the three most popular tracks, Dove Lake Circuit, the Overland Track and Cradle Mountain Peak was calculated using the GPS data. Walking on these tracks causes no damage to the surrounding environment, unless people stray from the track.
 
-(how to use the model, including a description of each of the items in the Interface tab)
+Scenic viewpoints - Nine destinations along the tracks which include cradle mountain peak, marions lookout, lake lilla, and hansons peak provide a scenic view and thus increase tourists satisfaction. Tourists will walk towards these locations and will stay at these locations for 20 minutes. These points have the potential to become overcrowded, increasing environmental damage as people expand beyond the designated area, and decreasing satisfaction with the area.
 
-## THINGS TO NOTICE
+Temporal scale - Assuming a walking speed of 1 m/s, it will take a person 3 seconds to traverse a cell. As we want to model vegetation damage to each cell, the temporal resolution will be 3 seconds. If this is computationally infeasible, the temporal scale could be simplified, with larger movements corresponding to an average damage across cells.
 
-(suggested things for the user to notice while running the model)
+##   Process overview and scheduling
+Firstly, people move according to the movement submodel. The environment people walk on then becomes damaged according to its type and hardiness. If people complete a walk or arrive at a certain scenic attraction, their happiness increases. They will then select another walk or attraction to visit. If a day is completed, some visitors will leave if their stay period is over, and new ones will arrive according to the visitation submodel.
 
-## THINGS TO TRY
+##   Design Concepts
+The principles addressed by this model are the human desire to visit popular scenic locations, and human-caused damage to those locations. Humans walk through the park to visit locations, largely along marked paths but with some deviations. They cause damage to the locations they walk through based on the presence of paths, and their collective numbers. This allows an examination of the collective effect of visitation on the environment.
 
-(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
+Environmental protection is desired for the conservation of native species, but also to preserve the scenic beauty of the park; if it becomes too damaged by human activity, it will no longer be a desirable, pristine piece of nature.
 
-## EXTENDING THE MODEL
+People visit parks such as Cradle Mountain to have positive, new, experiences. It can be seen as an altruistic goal to allow as many people as possible to have this unique experience. It can also have a positive effect on the state economy - even if the park itself is not aggressively monetised, it still draws many visitors to the state, which benefits the wider tourism industry. The park currently has limited commercial operations, and thus this model will not examine commercial implications. However, high visitation is still assumed to be positive. It is also evident that if environmental mitigations applied to visitors become too invasive, the environment is too degraded, or the location is too overcrowded, their satisfaction with their visit will decrease. Restrictions on visitor numbers could protect the environment and increase the satisfaction of individual visitors, but still disappoint the general populace. Thus a useful parameter is ‘person-satisfaction’, taken as the multiplication of number of visitors and satisfaction score. Optimising this will encourage as many visitors as possible without devaluing their experience too much, and with minimal impact on the environment. The details of this metric will be explored further in the implementation of the model.
 
-(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
+##   Initialisation
+The model will be initialised based on data and estimations about the Cradle Mountain national park. 210k people visit per year, for an average of 575 arrivals per day, with an average stay of 2 days. The environment will be initialised with a topographic map of the area. The location of tracks and lakes and area’s elevation were initialised using GPS data. Scenic viewpoints were based on markings on tourist maps. Vegetation was initialised with the vegetation submodel, except for where tracks are marked.
 
-## NETLOGO FEATURES
+##   Submodels
+Fauna trampling damage / regeneration
+Different fauna exist in different parts of the park, particularly dependent on elevation. These types have different tolerance to trampling, both in terms of hardiness and regrowth potential [1]. To simplify this elevation was used as a proxy for human traffic capacity. Elevation from samples of the surrounding area was obtained from AllTrails to determine the elevation in these key points. These values were then diffused to cover all patches in between to give a rough approximation of the landscape. Elevation within this area ranges from 800-1500. Higher elevation is negatively correlated with vegetation hardiness calculated as follows: maximum health = (2000 - elevation) / 1200 * 100. This gives scores between 41 for the highest points and 100 for the lowest points. Each time a patch is stepped on its health decreases by one. At the end of each day, patches that were not trampled increase their health by 15%. If the vegetation’s health drops below 5 it is considered dead and then requires at least one healthy neighbour to regrow. The growth and damage numbers were chosen as an approximation of vegetation behaviour. 
 
-(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
+Human movement - The environmental damage caused to the park depends significantly on human movement, and modelling this movement requires several assumptions. It is assumed people largely follow walking tracks to visit certain scenic views. It is also assumed people will sometimes stray from the track, to explore or take photographs. Random deviations from the track will thus be modelled where a person will choose a random target within 30m of the track, then walk there and back, causing vegetation damage in the process.
 
-## RELATED MODELS
-
-(models in the NetLogo Models Library and elsewhere which are of related interest)
-
-## CREDITS AND REFERENCES
-
-(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
+Visitor arrival - In the initial model, visitor numbers will be held constant, and the effects of their movement on the environment will be examined. Reductions on arrivals can then be imposed as a possible intervention to examine the environmental impact. Potential extensions can use visitor satisfaction as a metric which affects desire to visit the park and thus future visitor numbers.
 @#$#@#$#@
 default
 true
