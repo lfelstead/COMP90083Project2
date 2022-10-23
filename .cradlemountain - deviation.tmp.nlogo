@@ -519,7 +519,7 @@ tourist-count
 tourist-count
 0
 2000
-2000.0
+1000.0
 1
 1
 NIL
@@ -608,7 +608,7 @@ deviation-chance
 deviation-chance
 0
 10
-1.5
+5.0
 0.1
 1
 %
@@ -1068,7 +1068,7 @@ NetLogo 6.2.2
   <experiment name="experiment" repetitions="1" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>repeat day-length[go]</go>
-    <timeLimit steps="100"/>
+    <timeLimit steps="50"/>
     <metric>ticks</metric>
     <metric>count patches with [vegetation-health &lt; 5 and not path? and not lake?]</metric>
     <metric>happiness-avg / happiness-count</metric>
@@ -1083,16 +1083,7 @@ NetLogo 6.2.2
     <metric>vegetation-decile 9</metric>
     <metric>vegetation-decile 10</metric>
     <enumeratedValueSet variable="tourist-count">
-      <value value="2000"/>
-      <value value="1800"/>
-      <value value="1600"/>
-      <value value="1400"/>
-      <value value="1200"/>
-      <value value="1000"/>
-      <value value="800"/>
-      <value value="600"/>
-      <value value="400"/>
-      <value value="200"/>
+      <value value="500"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="shortcutting-tourists">
       <value value="5"/>
@@ -1104,7 +1095,13 @@ NetLogo 6.2.2
       <value value="0"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="deviation-chance">
+      <value value="5"/>
+      <value value="3"/>
+      <value value="2"/>
       <value value="1.5"/>
+      <value value="1"/>
+      <value value="0.5"/>
+      <value value="0"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="vegetation-growth-rate">
       <value value="15"/>

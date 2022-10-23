@@ -1065,7 +1065,7 @@ NetLogo 6.2.2
 @#$#@#$#@
 @#$#@#$#@
 <experiments>
-  <experiment name="experiment" repetitions="1" runMetricsEveryStep="true">
+  <experiment name="experiment" repetitions="3" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>repeat day-length[go]</go>
     <timeLimit steps="100"/>
@@ -1093,6 +1093,7 @@ NetLogo 6.2.2
       <value value="600"/>
       <value value="400"/>
       <value value="200"/>
+      <value value="100"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="shortcutting-tourists">
       <value value="5"/>
