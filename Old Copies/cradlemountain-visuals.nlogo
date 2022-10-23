@@ -440,8 +440,8 @@ GRAPHICS-WINDOW
 260
 -140
 140
-0
-0
+1
+1
 1
 ticks
 30.0
@@ -519,7 +519,7 @@ tourist-count
 tourist-count
 0
 2000
-1000.0
+500.0
 1
 1
 NIL
@@ -623,7 +623,7 @@ attraction-exploration-radius
 attraction-exploration-radius
 0
 20
-4.0
+3.0
 1
 1
 NIL
@@ -707,13 +707,30 @@ vegetation-unhappiness-threshold
 %
 HORIZONTAL
 
-MONITOR
-556
-614
-655
-659
+BUTTON
+627
+544
+814
+578
 NIL
-count tourists
+repeat day-length * 20 [go]
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+MONITOR
+652
+682
+914
+728
+NIL
+count patches with [not path? and not lake?]
 17
 1
 11
@@ -1065,10 +1082,10 @@ NetLogo 6.2.2
 @#$#@#$#@
 @#$#@#$#@
 <experiments>
-  <experiment name="experiment" repetitions="1" runMetricsEveryStep="true">
+  <experiment name="experiment" repetitions="3" sequentialRunOrder="false" runMetricsEveryStep="true">
     <setup>setup</setup>
     <go>repeat day-length[go]</go>
-    <timeLimit steps="50"/>
+    <timeLimit steps="100"/>
     <metric>ticks</metric>
     <metric>count patches with [vegetation-health &lt; 5 and not path? and not lake?]</metric>
     <metric>happiness-avg / happiness-count</metric>
@@ -1083,7 +1100,12 @@ NetLogo 6.2.2
     <metric>vegetation-decile 9</metric>
     <metric>vegetation-decile 10</metric>
     <enumeratedValueSet variable="tourist-count">
+      <value value="100"/>
+      <value value="300"/>
       <value value="500"/>
+      <value value="700"/>
+      <value value="900"/>
+      <value value="1500"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="shortcutting-tourists">
       <value value="5"/>
@@ -1101,11 +1123,7 @@ NetLogo 6.2.2
       <value value="15"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="attraction-exploration-radius">
-      <value value="5"/>
-      <value value="4"/>
       <value value="3"/>
-      <value value="2"/>
-      <value value="1"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="damage-per-step">
       <value value="1"/>

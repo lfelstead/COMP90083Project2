@@ -1,3 +1,7 @@
+;; Computational Modelling and Simulation Project
+;; Ivy Brain (1084265) and Lily Felstead (1292118)
+;; Oct 2022
+
 breed [ attractions attraction ]
 breed [ tourists tourist ]
 breed [ entrances entry ]
@@ -38,15 +42,18 @@ end
 
 to go
 
-  ;; Length of day
+  ;; Actions at the end of the day
   if time >= day-length or (test-regrowth-after > 0 and ticks > test-regrowth-after) [
     set time 0
+
+    ;; Remove any remaining tourists
     ask tourists [tourist-remove]
 
     set current-tourists 0
 
     tick
 
+    ;; Regrow vegetation and recolour the map accordingly
     vetegation-growth
     recolor-patches
 
@@ -155,8 +162,10 @@ end
 ;; Each path section stores the distance from it to each possible goal
 to calculate-path-distances
 
+  ;; For each possible goal
   ask (turtle-set attractions entrances) [
     let goal-no who
+    ;; Get its immediately surrounding patches to record the distance to the goal, and propogate that to their neighbours
     ask patches in-radius 5 with [path?] [
       set dist-goals replace-item goal-no dist-goals distance myself
       propogate-distances goal-no
@@ -171,7 +180,7 @@ to propogate-distances [goal-no]
 
   ask neighbors with [path?] [
 
-    ;; Update closest distance to goal if new distance is less than already recorded
+    ;; Update closest distance to goal if new distance is significantly less than already recorded
 
     if [item goal-no dist-goals] of myself <= item goal-no dist-goals - 2 [
 
@@ -185,19 +194,24 @@ to propogate-distances [goal-no]
 
 end
 
+;; Generate tourists according to the visitor arrival submodel
 to gen-tourists
 
 
   ;; Arrivals start 7am, peak 11am, end 3pm
   let hour (time / day-length) * 24
+
+  ;; Absolute linear equation that dictates arrivals
   let tourists-this-tick (tourist-count / (day-length / 3)) * 2 * ((- abs ((hour - 11) / 4)) + 1)
+
 
   if tourists-this-tick > 0 [
 
+    ;; tourists-this-tick is often fractional, so store the cumulative output, then make sure that number of tourists exist in the system
     set current-tourists current-tourists + tourists-this-tick
     let num-to-gen int (current-tourists - count tourists)
 
-    ;; Dove lake carpark more popular - gets 80% of arrivals
+    ;; Dove lake carpark more popular - gets 80% of arrivals, ronny creek gets 20%
     ifelse random-float 1 < 0.8 [
       ask [patch-here] of entry 10 [
         sprout-tourists (int num-to-gen) [tourist-init]
@@ -213,25 +227,29 @@ to gen-tourists
 
 end
 
+;; Initialises the variables for each tourist
 to tourist-init
   set goal one-of attractions
   set size 2
   set color yellow
 
+  ;; If not adheres, then this tourist will take shortcuts off the track
   set adheres? random-float 100 > shortcutting-tourists
 
   if not adheres? [set color pink]
 
-  set path-plan []
+  ;; Position to go to when deviating from path, and position to return to
   set deviation-pos nobody
   set return-pos patch-here
 
   set happiness 100
 
+  ;; Tracks how long a tourist has been exploring an attraction
   set exploration-start -1000
 
 end
 
+;; When a tourist is removed, add their happiness to the daily average
 to tourist-remove
   set happiness-avg happiness-avg + happiness
   set happiness-count happiness-count + 1
@@ -243,7 +261,11 @@ to vetegation-growth
   ask patches with [not trampled?] [
     ;Only regrow if not dead, or has healthy neighbours
     if not dead? or any? neighbors with [vegetation-health > 0.6 * max-health] [
+
+      ;; Health gain is a parmeter percentage of the healthiest neighbour's health
       set vegetation-health min list (vegetation-health + ([vegetation-health] of max-one-of neighbors [vegetation-health] * vegetation-growth-rate / 100)) max-health
+
+      ;; Un-die if health is raised above threshold
       if vegetation-health >= 5
       [ set dead? false ]
     ]
@@ -271,17 +293,18 @@ to recolor-patches
    ]
 end
 
-;; tourist code - copied from paths
+
 to move-tourists
   ask tourists [
 
+    ;; Actions if the tourist is at their goal (an attraction or a carpark at the end of the day)
+    ;; Force the tourist to turn back towards carpark if time is later than 6pm (18)
     if any? (patch-set [patch-here] of goal) in-radius 5 or ((time / day-length) * 24 > 18 and not member? goal entrances) [
+
+      ;; Start tracking the time they stay at this attraction, default 20m
       set exploration-start time
 
-;      if any? (patch-set [patch-here] of goal) in-radius 5 and member? goal attractions [ ; increase happiness when goal is reached
-;        set happiness happiness + 20
-;      ]
-
+      ;; If they're back at the carpark, remove them
       if member? goal entrances [
         tourist-remove
       ]
@@ -290,9 +313,11 @@ to move-tourists
       ifelse (time / day-length) * 24 > 16 [
         set goal min-one-of entrances [distance myself]
       ] [
+      ;; Otherwise pick a new attraction to go towards
         set goal one-of attractions
       ]
     ]
+
     walk-towards-goal
 
     ; change happiness depending on the amount of tourists around
@@ -310,19 +335,18 @@ to move-tourists
   ]
 end
 
+
 to walk-towards-goal
   ask patch-here [ vegetation-trampled ]
 
-  if length path-plan > 0 [
-    move-to item 0 path-plan
-    set path-plan but-first path-plan
-    stop
-  ]
+  ;; If the tourist is exploring an attraction, set a deviation position within the exploration radius
 
   if deviation-pos = nobody and time - exploration-start < (attraction-exploration-time * 5) [
     set return-pos patch-here
     set deviation-pos one-of patches in-radius attraction-exploration-radius with [pcolor != 95]
   ]
+
+  ;; Tourists set a nearby deviation point with deviation-chance
 
   if deviation-pos = nobody and random-float 100 < deviation-chance and [path?] of patch-here [
     set return-pos patch-here
@@ -330,10 +354,13 @@ to walk-towards-goal
 
   ]
 
+  ;; If there is a deviation position set, move towards it
   ifelse deviation-pos != nobody [
     face deviation-pos
     fd 1
 
+    ;; If the tourist has reached the deviation position, set it to the return position, so next step they'll walk back
+    ;; If deviation and return are the same, then they've finished the deviation so clear it
     if patch-here = deviation-pos [
 
       ifelse deviation-pos = return-pos [
@@ -347,6 +374,7 @@ to walk-towards-goal
 
   ] [
 
+    ;; Run pathfinding to tell which way to face, then move forward
     set heading best-way-to goal
     fd 1
   ]
@@ -355,17 +383,21 @@ end
 to-report best-way-to [ destination ]
 
 
-  ; of all the visible route patches, select the ones
-  ; that would take me closer to my destination
+  ;; Find the agent number of the destination
 
   let goal-no ([who] of destination)
 
+  ;; Only goals 0 through 11 exist and have recorded paths. Head in a straight line as a failsafe
   if goal-no > 11 [report towards destination]
 
+  ;; If there is a nearby path patch with a lower distance to my destination, select it
   let visible-patches patches in-radius 3
   let visible-routes visible-patches with [ path? ]
 
   let routes-that-take-me-closer visible-routes with [
+    ;; dist-goals is a list belonging to each path patch, with each item storing the distance along that path to the corrensponding goal
+
+    ;; select the paths with lower distance to this tourist's particular goal
     item goal-no dist-goals < [ item goal-no dist-goals - 1] of [patch-here] of myself
   ]
 
@@ -376,7 +408,7 @@ to-report best-way-to [ destination ]
 
     ;; If this person does not adhere to track rules, they'll take a shortcut if the path deviates from the
     ;; 'as the crow flies' direction to destination by more than shortcut-threshold degrees
-    ;; Extra condition to keep them walking through water
+
 
     ifelse not adheres? and ((abs (towards next-path - towards destination)) >= shortcut-threshold)
     [
@@ -387,25 +419,19 @@ to-report best-way-to [ destination ]
 
     ]
 
+    ;; If they're a good person, they'll go to the next path segment
     [set heading towards next-path]
 
   ]
+
+  ;; If there are no paths in the vincinity, just walk straight towards destination
   [set heading towards destination]
 
-  ;; More effort to stop them walking through water
-;  if patch-ahead 1 != nobody and [pcolor] of patch-ahead 1 = 95 [ ;; Go around water
-;      ifelse any? patches with [pcolor != 95] in-radius 3 [
-;        report towards min-one-of patches with [pcolor != 95] in-radius 3 [distance destination]
-;      ]
-;      [
-;        report towards destination
-;      ]
-;  ]
-
-  ; if there are no nearby routes to my destination
   report heading
 
 end
+
+;; Old attempt to implement A* in Netlogo to avoid lakes - was quite doomed
 
 to-report find-path [goal-no]
   ask neighbors with [pcolor != 95] [

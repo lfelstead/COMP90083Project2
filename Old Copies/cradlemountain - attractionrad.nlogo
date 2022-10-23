@@ -519,7 +519,7 @@ tourist-count
 tourist-count
 0
 2000
-1000.0
+500.0
 1
 1
 NIL
@@ -593,7 +593,7 @@ shortcut-threshold
 shortcut-threshold
 0
 180
-60.0
+63.0
 1
 1
 degrees
@@ -623,7 +623,7 @@ attraction-exploration-radius
 attraction-exploration-radius
 0
 20
-4.0
+3.0
 1
 1
 NIL
@@ -1106,6 +1106,98 @@ NetLogo 6.2.2
       <value value="3"/>
       <value value="2"/>
       <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="damage-per-step">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="attraction-exploration-time">
+      <value value="20"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="ar-sensitivity" repetitions="3" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>repeat day-length[go]</go>
+    <timeLimit steps="50"/>
+    <metric>ticks</metric>
+    <metric>count patches with [vegetation-health &lt; 5 and not path? and not lake?]</metric>
+    <metric>happiness-avg / happiness-count</metric>
+    <metric>vegetation-decile 1</metric>
+    <metric>vegetation-decile 2</metric>
+    <metric>vegetation-decile 3</metric>
+    <metric>vegetation-decile 4</metric>
+    <metric>vegetation-decile 5</metric>
+    <metric>vegetation-decile 6</metric>
+    <metric>vegetation-decile 7</metric>
+    <metric>vegetation-decile 8</metric>
+    <metric>vegetation-decile 9</metric>
+    <metric>vegetation-decile 10</metric>
+    <enumeratedValueSet variable="tourist-count">
+      <value value="500"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="shortcutting-tourists">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="shortcut-threshold">
+      <value value="60"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="test-regrowth-after">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="deviation-chance">
+      <value value="1.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="vegetation-growth-rate">
+      <value value="15"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="attraction-exploration-radius">
+      <value value="3.15"/>
+      <value value="2.85"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="damage-per-step">
+      <value value="1"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="attraction-exploration-time">
+      <value value="20"/>
+    </enumeratedValueSet>
+  </experiment>
+  <experiment name="sthr-sensitivity" repetitions="3" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>repeat day-length[go]</go>
+    <timeLimit steps="50"/>
+    <metric>ticks</metric>
+    <metric>count patches with [vegetation-health &lt; 5 and not path? and not lake?]</metric>
+    <metric>happiness-avg / happiness-count</metric>
+    <metric>vegetation-decile 1</metric>
+    <metric>vegetation-decile 2</metric>
+    <metric>vegetation-decile 3</metric>
+    <metric>vegetation-decile 4</metric>
+    <metric>vegetation-decile 5</metric>
+    <metric>vegetation-decile 6</metric>
+    <metric>vegetation-decile 7</metric>
+    <metric>vegetation-decile 8</metric>
+    <metric>vegetation-decile 9</metric>
+    <metric>vegetation-decile 10</metric>
+    <enumeratedValueSet variable="tourist-count">
+      <value value="500"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="shortcutting-tourists">
+      <value value="5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="shortcut-threshold">
+      <value value="63"/>
+      <value value="57"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="test-regrowth-after">
+      <value value="0"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="deviation-chance">
+      <value value="1.5"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="vegetation-growth-rate">
+      <value value="15"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="attraction-exploration-radius">
+      <value value="3"/>
     </enumeratedValueSet>
     <enumeratedValueSet variable="damage-per-step">
       <value value="1"/>
